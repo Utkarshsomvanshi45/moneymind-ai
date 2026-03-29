@@ -55,32 +55,32 @@ def extract_json(text: str) -> dict:
 # ─────────────────────────────────────────
 
 class HealthScoreInput(BaseModel):
-    monthly_income: float
-    monthly_expenses: float
-    age: int
-    dependents: int
-    emergency_fund: float
-    has_health_insurance: bool
+    monthly_income: Optional[float] = 0
+    monthly_expenses: Optional[float] = 0
+    age: Optional[int] = 28
+    dependents: Optional[int] = 0
+    emergency_fund: Optional[float] = 0
+    has_health_insurance: Optional[bool] = False
     health_insurance_cover: Optional[float] = 0
-    has_term_insurance: bool
+    has_term_insurance: Optional[bool] = False
     term_insurance_cover: Optional[float] = 0
-    monthly_sip: float
-    total_investments: float
-    total_loans: float
-    monthly_emi: float
-    has_retirement_plan: bool
+    monthly_sip: Optional[float] = 0
+    total_investments: Optional[float] = 0
+    total_loans: Optional[float] = 0
+    monthly_emi: Optional[float] = 0
+    has_retirement_plan: Optional[bool] = False
 
 
 class TaxWizardInput(BaseModel):
-    basic_salary: float
-    hra_received: float
-    rent_paid: float
-    special_allowances: float
-    investments_80c: float
-    health_insurance_80d: float
-    nps_80ccd: float
-    home_loan_interest: float
-    other_deductions: float
+    basic_salary: Optional[float] = 0
+    hra_received: Optional[float] = 0
+    rent_paid: Optional[float] = 0
+    special_allowances: Optional[float] = 0
+    investments_80c: Optional[float] = 0
+    health_insurance_80d: Optional[float] = 0
+    nps_80ccd: Optional[float] = 0
+    home_loan_interest: Optional[float] = 0
+    other_deductions: Optional[float] = 0
 
 
 class FundEntry(BaseModel):
@@ -109,6 +109,11 @@ class ChatInput(BaseModel):
 # ENDPOINT 1 — HEALTH SCORE
 # Shape matches frontend mockData exactly
 # ─────────────────────────────────────────
+
+@app.get("/health-score")
+async def health_score_info():
+    return {"endpoint": "POST /health-score", "description": "Submit financial data to get health score"}
+
 
 @app.post("/health-score")
 async def health_score(data: HealthScoreInput):
@@ -176,6 +181,11 @@ Replace every 0 with real calculated values. Actions must target the user's 3 we
 # ENDPOINT 2 — TAX WIZARD
 # Shape matches frontend mockData exactly
 # ─────────────────────────────────────────
+
+@app.get("/tax-wizard")
+async def tax_wizard_info():
+    return {"endpoint": "POST /tax-wizard", "description": "Submit salary data to calculate tax"}
+
 
 @app.post("/tax-wizard")
 async def tax_wizard(data: TaxWizardInput):

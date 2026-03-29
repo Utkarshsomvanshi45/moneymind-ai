@@ -32,14 +32,20 @@ export function useApi<TInput, TOutput>(
         setLoading(false);
         return result;
       }
-      throw new Error('API not available');
-    } catch {
-      // Fall back to mock data with realistic delay
-      await new Promise(resolve => setTimeout(resolve, options.mockDelay ?? 1500));
-      setData(mockData);
-      setLoading(false);
-      return mockData;
+
+      // Non-OK response — log detail then fall through to mock
+      const errText = await response.text().catch(() => response.statusText);
+      console.warn(`[useApi] ${endpoint} returned ${response.status}:`, errText);
+    } catch (networkErr) {
+      // Network error (offline, CORS, etc.)
+      console.warn(`[useApi] ${endpoint} network error:`, networkErr);
     }
+
+    // Fall back to mock data with realistic delay
+    await new Promise(resolve => setTimeout(resolve, options.mockDelay ?? 1500));
+    setData(mockData);
+    setLoading(false);
+    return mockData;
   }, [endpoint, mockData, options.mockDelay]);
 
   const reset = useCallback(() => {
