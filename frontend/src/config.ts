@@ -1,4 +1,4 @@
-export const API_BASE = "https://moneymind-backend.onrender.com";
+export const API_BASE = "https://moneymind-ai.onrender.com";
 
 export const formatINR = (amount: number): string => {
   return new Intl.NumberFormat('en-IN', {
