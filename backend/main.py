@@ -1,5 +1,6 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException , Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from typing import Optional, List
 from groq import Groq
@@ -8,37 +9,37 @@ import os
 import re
 import fitz
 from dotenv import load_dotenv
-from fastapi.responses import JSONResponse
+
 load_dotenv()
 
 app = FastAPI(title="MoneyMind AI Backend")
 
-origins = [
-    "https://moneymind-frontend.onrender.com",
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "http://localhost:8080",
-]
+# ─────────────────────────────────────────
+# BULLETPROOF CORS — handles Render deployment
+# ─────────────────────────────────────────
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
 )
 
-@app.options("/{rest_of_path:path}")
-async def preflight_handler(rest_of_path: str):
-    return JSONResponse(
-        content={},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        }
-    )
+@app.middleware("http")
+async def add_cors_headers(request: Request, call_next):
+    if request.method == "OPTIONS":
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Max-Age"] = "86400"
+        return response
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
@@ -117,7 +118,6 @@ class ChatInput(BaseModel):
 
 # ─────────────────────────────────────────
 # ENDPOINT 1 — HEALTH SCORE
-# Shape matches frontend mockData exactly
 # ─────────────────────────────────────────
 
 @app.post("/health-score")
@@ -152,7 +152,7 @@ Overall = emergency_fund*0.25 + insurance*0.20 + investments*0.20 + debt*0.15 + 
 Status: score>=80 = "Good", score>=60 = "Needs attention", score<60 = "Critical"
 Grade: A for 85+, B+ for 75-84, B for 70-74, C for 55-69, D for 40-54, F for below 40
 
-IMPORTANT: Return ONLY valid JSON, no markdown, no explanation before or after:
+IMPORTANT: Return ONLY valid JSON. No markdown. No explanation. No text before or after the JSON:
 {{
   "overall_score": 0,
   "grade": "B+",
@@ -165,13 +165,13 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no explanation before or after:
     {{"name": "Retirement", "score": 0, "icon": "Target", "status": "Critical"}}
   ],
   "actions": [
-    {{"title": "specific action title with rupee amount", "impact": "specific rupee or percent impact"}},
-    {{"title": "specific action title with rupee amount", "impact": "specific rupee or percent impact"}},
-    {{"title": "specific action title with rupee amount", "impact": "specific rupee or percent impact"}}
+    {{"title": "specific action with rupee amount", "impact": "specific rupee impact"}},
+    {{"title": "specific action with rupee amount", "impact": "specific rupee impact"}},
+    {{"title": "specific action with rupee amount", "impact": "specific rupee impact"}}
   ]
 }}
 
-Replace every 0 with real calculated values. Actions must target the user's 3 weakest dimensions.
+Replace every 0 with real calculated values. Actions must target the 3 weakest dimensions.
 """
     try:
         raw = call_ai(prompt)
@@ -184,7 +184,6 @@ Replace every 0 with real calculated values. Actions must target the user's 3 we
 
 # ─────────────────────────────────────────
 # ENDPOINT 2 — TAX WIZARD
-# Shape matches frontend mockData exactly
 # ─────────────────────────────────────────
 
 @app.post("/tax-wizard")
@@ -218,7 +217,7 @@ Slabs: 0 up to 300000, 5% 300001-600000, 10% 600001-900000, 15% 900001-1200000, 
 87A rebate: if taxable income <= 700000 then tax = 0
 Add 4% cess on final tax
 
-IMPORTANT: Return ONLY valid JSON, no markdown, no explanation before or after:
+IMPORTANT: Return ONLY valid JSON. No markdown. No explanation. No text before or after:
 {{
   "old_regime": {{
     "tax": 0,
@@ -265,12 +264,10 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no explanation before or after:
   ]
 }}
 
-Rules:
-- recommended: regime with lower tax
-- savings: absolute difference between old and new tax values
-- missed_deductions amount: potential tax saving in rupees (gap * marginal rate). 0 if already maxed
-- breakdown old Deductions = HRA exemption + standard deduction + all other deductions claimed
-- Replace all 0 values with real calculated numbers
+Replace all 0 values with real calculated numbers.
+recommended: regime with lower tax.
+savings: absolute difference between old and new tax.
+missed_deductions amount: potential tax saving in rupees. 0 if already maxed.
 """
     try:
         raw = call_ai(prompt)
@@ -283,7 +280,6 @@ Rules:
 
 # ─────────────────────────────────────────
 # ENDPOINT 3 — PORTFOLIO X-RAY
-# Shape matches frontend mockData exactly
 # ─────────────────────────────────────────
 
 @app.post("/portfolio-xray")
@@ -305,13 +301,11 @@ PORTFOLIO:
 {funds_text}
 
 Total Invested: Rs {total_invested}
-Total Current Value: Rs {total_current}
+Total Current: Rs {total_current}
 Return: {abs_pct}%
 Funds: {len(data.funds)}
 
-Use your knowledge of Indian mutual funds for categories, expense ratios, and fund overlaps.
-
-IMPORTANT: Return ONLY valid JSON, no markdown, no explanation before or after:
+IMPORTANT: Return ONLY valid JSON. No markdown. No explanation. No text before or after:
 {{
   "xirr": 0.0,
   "nifty_comparison": 0.0,
@@ -326,24 +320,9 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no explanation before or after:
     {{"name": "Debt", "value": 0, "amount": 0, "color": "#3B82F6"}}
   ],
   "rebalancing": [
-    {{
-      "action": "SELL",
-      "fund": "fund name from portfolio",
-      "reason": "specific reason referencing the fund",
-      "benefit": "specific benefit with rupee or percent numbers"
-    }},
-    {{
-      "action": "BUY",
-      "fund": "recommended fund name",
-      "reason": "specific reason",
-      "benefit": "specific benefit"
-    }},
-    {{
-      "action": "SWITCH",
-      "fund": "fund name",
-      "reason": "specific reason",
-      "benefit": "specific benefit with numbers"
-    }}
+    {{"action": "SELL", "fund": "fund from portfolio", "reason": "specific reason", "benefit": "specific benefit"}},
+    {{"action": "BUY", "fund": "recommended fund", "reason": "specific reason", "benefit": "specific benefit"}},
+    {{"action": "SWITCH", "fund": "fund from portfolio", "reason": "specific reason", "benefit": "specific benefit"}}
   ],
   "performance": [
     {{"month": "Jan", "portfolio": 100, "nifty": 100}},
@@ -362,15 +341,12 @@ IMPORTANT: Return ONLY valid JSON, no markdown, no explanation before or after:
 }}
 
 Rules:
-- xirr: realistic estimate 8-25% based on dates and actual returns
-- nifty_comparison: xirr minus 13.0 (can be negative)
-- expense_drag: annual rupee cost from expense ratios across all funds
-- overlap_score: 60-80 for two large caps together, 10-20 for large+small
-- allocation values must sum to exactly 100
-- allocation amounts must sum to approximately {total_invested}
-- performance: both start at 100, show realistic monthly indexed values through the year
-- rebalancing actions must reference actual funds in the portfolio above
-- Replace all 0 values with real calculated numbers
+- xirr: realistic 8-25% based on dates and returns
+- nifty_comparison: xirr minus 13.0
+- allocation values sum to exactly 100
+- allocation amounts sum to approximately {total_invested}
+- performance both start at 100, realistic monthly growth
+- Replace all 0 with real values
 """
     try:
         raw = call_ai(prompt)
@@ -452,7 +428,7 @@ Return ONLY valid JSON, no markdown, no explanation:
   "home_loan_interest": 0,
   "other_deductions": 0
 }}
-Use 0 for missing fields. All amounts annual in rupees as plain numbers.
+Use 0 for missing fields. All amounts annual in rupees.
 
 DOCUMENT:
 {text[:3000]}
@@ -471,7 +447,7 @@ Return ONLY valid JSON, no markdown, no explanation:
     }}
   ]
 }}
-One entry per fund. Earliest transaction date as start_date. Amounts in rupees.
+One entry per fund. Earliest transaction date as start_date.
 
 DOCUMENT:
 {text[:4000]}
