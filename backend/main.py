@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException , Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
@@ -8,18 +8,37 @@ import os
 import re
 import fitz
 from dotenv import load_dotenv
-
+from fastapi.responses import JSONResponse
 load_dotenv()
 
 app = FastAPI(title="MoneyMind AI Backend")
 
+origins = [
+    "https://moneymind-frontend.onrender.com",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:8080",
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+@app.options("/{rest_of_path:path}")
+async def preflight_handler(rest_of_path: str):
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
