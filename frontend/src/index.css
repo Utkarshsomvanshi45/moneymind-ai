@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+
+    --card: 0 0% 5.1%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 0 0% 5.1%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 153 100% 50%;
+    --primary-foreground: 0 0% 0%;
+
+    --secondary: 263 84% 58%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 10.2%;
+    --muted-foreground: 0 0% 63.9%;
+
+    --accent: 0 0% 7.8%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+
+    --border: 0 0% 100% / 0.06;
+    --input: 0 0% 10.2%;
+    --ring: 153 100% 50%;
+
+    --radius: 0.625rem;
+
+    --surface-1: 0 0% 5.1%;
+    --surface-2: 0 0% 7.8%;
+    --surface-3: 0 0% 10.2%;
+
+    --sidebar-background: 0 0% 0%;
+    --sidebar-foreground: 0 0% 63.9%;
+    --sidebar-primary: 153 100% 50%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 7.8%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 100% / 0.06;
+    --sidebar-ring: 153 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Space Grotesk', 'Inter', sans-serif;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(135deg, #00FF87, #7C3AED);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-gradient-brand {
+    background: linear-gradient(135deg, #00FF87, #7C3AED);
+  }
+
+  .border-default {
+    border-color: rgba(255,255,255,0.06);
+  }
+
+  .border-hover {
+    border-color: rgba(255,255,255,0.12);
+  }
+
+  .border-accent-glow {
+    border-color: rgba(0,255,135,0.3);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 60px rgba(0,255,135,0.06);
+  }
+
+  .glow-green-strong {
+    box-shadow: 0 0 40px rgba(0,255,135,0.12);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, hsl(0 0% 10.2%) 25%, hsl(0 0% 14.1%) 50%, hsl(0 0% 10.2%) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-slide-up {
+  animation: fadeSlideUp 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes dot-bounce {
+  0%, 80%, 100% { transform: scale(0.6); }
+  40% { transform: scale(1); }
+}
+
+.typing-dot {
+  animation: dot-bounce 1.2s ease-in-out infinite;
+}
+
+@keyframes page-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.page-enter {
+  animation: page-enter 0.2s ease-out;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.2);
+}
