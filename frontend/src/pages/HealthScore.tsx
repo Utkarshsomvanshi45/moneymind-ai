@@ -55,7 +55,26 @@ export default function HealthScore() {
 
   const updateField = (key: string, value: unknown) => setForm(prev => ({ ...prev, [key]: value }));
 
-  const handleAnalyze = () => execute(form);
+  const handleAnalyze = () => {
+    // Transform form data from frontend naming to backend naming
+    const payload = {
+      monthly_income: parseFloat(form.income) || 0,
+      monthly_expenses: parseFloat(form.expenses) || 0,
+      age: form.age,
+      dependents: form.dependents,
+      emergency_fund: parseFloat(form.emergencyFund) || 0,
+      has_health_insurance: form.hasHealth || false,
+      health_insurance_cover: form.hasHealth ? parseFloat(form.healthCover) || 0 : 0,
+      has_term_insurance: form.hasTerm || false,
+      term_insurance_cover: form.hasTerm ? parseFloat(form.termCover) || 0 : 0,
+      monthly_sip: parseFloat(form.sip) || 0,
+      total_investments: parseFloat(form.investments) || 0,
+      total_loans: parseFloat(form.loans) || 0,
+      monthly_emi: parseFloat(form.emi) || 0,
+      has_retirement_plan: form.hasRetirement || false,
+    };
+    execute(payload);
+  };
 
   const radarData = data ? data.dimensions.map(d => ({ subject: d.name, score: d.score, fullMark: 100 })) : [];
 

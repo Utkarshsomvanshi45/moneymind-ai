@@ -39,7 +39,21 @@ export default function TaxWizard() {
 
   const updateField = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
 
-  const handleCalculate = () => execute(form);
+  const handleCalculate = () => {
+    // Transform form data from frontend naming to backend naming
+    const payload = {
+      basic_salary: parseFloat(form.salary) || 0,
+      hra_received: parseFloat(form.hra) || 0,
+      rent_paid: parseFloat(form.rent) || 0,
+      special_allowances: parseFloat(form.allowances) || 0,
+      investments_80c: parseFloat(form.sec80c) || 0,
+      health_insurance_80d: parseFloat(form.sec80d) || 0,
+      nps_80ccd: parseFloat(form.nps) || 0,
+      home_loan_interest: parseFloat(form.homeLoan) || 0,
+      other_deductions: parseFloat(form.other) || 0,
+    };
+    execute(payload);
+  };
 
   const oldTax = useCountUp(data ? data.old_regime.tax : 0, 1200, !!data);
   const newTax = useCountUp(data ? data.new_regime.tax : 0, 1200, !!data);

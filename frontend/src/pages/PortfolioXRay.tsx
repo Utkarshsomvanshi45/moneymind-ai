@@ -136,7 +136,18 @@ export default function PortfolioXRay() {
                 <Plus size={16} /> Add another fund
               </button>
 
-              <button onClick={() => execute({ funds })} disabled={loading}
+              <button onClick={() => {
+                // Transform funds data from frontend naming to backend naming
+                const transformedFunds = funds
+                  .filter(f => f.name && f.invested && f.current && f.startDate) // Only include filled funds
+                  .map(fund => ({
+                    fund_name: fund.name,
+                    invested_amount: parseFloat(fund.invested) || 0,
+                    current_value: parseFloat(fund.current) || 0,
+                    start_date: fund.startDate,
+                  }));
+                execute({ funds: transformedFunds });
+              }} disabled={loading}
                 className="w-full bg-primary text-primary-foreground font-bold py-3.5 rounded-lg hover:bg-[#00E07A] hover:scale-[1.01] transition-all text-base disabled:opacity-60 flex items-center justify-center gap-2">
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
