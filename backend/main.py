@@ -15,7 +15,7 @@ app = FastAPI(title="MoneyMind AI Backend")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://moneymind-frontend.onrender.com"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -98,13 +98,13 @@ class ChatInput(BaseModel):
 
 # ─────────────────────────────────────────
 # ENDPOINT 1 — HEALTH SCORE
+# Shape matches frontend mockData exactly
 # ─────────────────────────────────────────
 
 @app.post("/health-score")
 async def health_score(data: HealthScoreInput):
     prompt = f"""
-You are a certified Indian financial planner (CFP). Analyze this person's
-financial data and return a comprehensive Money Health Score.
+You are a certified Indian financial planner. Analyze this person's financial data.
 
 USER DATA:
 - Monthly Income: Rs {data.monthly_income}
@@ -121,53 +121,38 @@ USER DATA:
 - Has Retirement Plan: {data.has_retirement_plan}
 
 SCORING RULES:
-1. emergency_fund: Ideal = 6x monthly expenses = Rs {data.monthly_expenses * 6}. Score = (actual / ideal) * 100, max 100.
-2. insurance: 0 if no health insurance. +50 for health insurance with adequate cover. +50 for term insurance with cover >= 10x annual income.
-3. investments: savings_rate = monthly_sip / monthly_income. Score = min(savings_rate / 0.20 * 100, 100). 20% savings rate = perfect score.
-4. debt: emi_ratio = monthly_emi / monthly_income. Score = max(0, 100 - (emi_ratio * 200)). 0 EMI = 100. 50% income in EMI = 0.
-5. tax_efficiency: Estimate based on income. Above Rs 10L with no 80C investments = low score. Good investments = high score.
-6. retirement: 100 if has plan AND age < 35. 70 if has plan AND age 35-50. 40 if no plan AND age < 35. 10 if no plan AND age > 50.
+1. Emergency Fund: Ideal = Rs {data.monthly_expenses * 6}. Score = min(actual/ideal*100, 100)
+2. Insurance: 0 if no health insurance. 50 for health insurance. +50 if term >= 10x annual income
+3. Investments: savings_rate = sip/income. Score = min(savings_rate/0.20*100, 100)
+4. Debt Management: emi_ratio = emi/income. Score = max(0, 100 - emi_ratio*200)
+5. Tax Efficiency: Low if high income with no 80C investments. High if maxing 80C
+6. Retirement: 100 if plan+age<35. 70 if plan+age 35-50. 40 if no plan+age<35. 10 if no plan+age>50
 
-Overall = weighted average: emergency_fund*0.25 + insurance*0.20 + investments*0.20 + debt*0.15 + tax_efficiency*0.10 + retirement*0.10
+Overall = emergency_fund*0.25 + insurance*0.20 + investments*0.20 + debt*0.15 + tax*0.10 + retirement*0.10
 
-IMPORTANT: Return ONLY a valid JSON object. No explanation, no markdown, no text before or after. Just the raw JSON.
+Status: score>=80 = "Good", score>=60 = "Needs attention", score<60 = "Critical"
+Grade: A for 85+, B+ for 75-84, B for 70-74, C for 55-69, D for 40-54, F for below 40
 
+IMPORTANT: Return ONLY valid JSON, no markdown, no explanation before or after:
 {{
-  "scores": {{
-    "emergency_fund": 0,
-    "insurance": 0,
-    "investments": 0,
-    "debt": 0,
-    "tax_efficiency": 0,
-    "retirement": 0
-  }},
-  "overall": 0,
-  "grade": "B",
-  "summary": "2 sentence plain English summary of their financial health",
-  "top_actions": [
-    {{
-      "priority": 1,
-      "action": "specific action with rupee amounts",
-      "impact": "specific rupee or percent impact per year",
-      "category": "emergency_fund"
-    }},
-    {{
-      "priority": 2,
-      "action": "specific action with rupee amounts",
-      "impact": "specific rupee or percent impact per year",
-      "category": "insurance"
-    }},
-    {{
-      "priority": 3,
-      "action": "specific action with rupee amounts",
-      "impact": "specific rupee or percent impact per year",
-      "category": "investments"
-    }}
+  "overall_score": 0,
+  "grade": "B+",
+  "dimensions": [
+    {{"name": "Emergency Fund", "score": 0, "icon": "Shield", "status": "Needs attention"}},
+    {{"name": "Insurance", "score": 0, "icon": "Heart", "status": "Critical"}},
+    {{"name": "Investments", "score": 0, "icon": "TrendingUp", "status": "Good"}},
+    {{"name": "Debt Management", "score": 0, "icon": "CreditCard", "status": "Good"}},
+    {{"name": "Tax Efficiency", "score": 0, "icon": "Receipt", "status": "Needs attention"}},
+    {{"name": "Retirement", "score": 0, "icon": "Target", "status": "Critical"}}
+  ],
+  "actions": [
+    {{"title": "specific action title with rupee amount", "impact": "specific rupee or percent impact"}},
+    {{"title": "specific action title with rupee amount", "impact": "specific rupee or percent impact"}},
+    {{"title": "specific action title with rupee amount", "impact": "specific rupee or percent impact"}}
   ]
 }}
 
-Replace every 0 and placeholder with real calculated values.
-Grade rules: A for 85+, B for 70-84, C for 55-69, D for 40-54, F for below 40.
+Replace every 0 with real calculated values. Actions must target the user's 3 weakest dimensions.
 """
     try:
         raw = call_ai(prompt)
@@ -180,6 +165,7 @@ Grade rules: A for 85+, B for 70-84, C for 55-69, D for 40-54, F for below 40.
 
 # ─────────────────────────────────────────
 # ENDPOINT 2 — TAX WIZARD
+# Shape matches frontend mockData exactly
 # ─────────────────────────────────────────
 
 @app.post("/tax-wizard")
@@ -190,129 +176,82 @@ async def tax_wizard(data: TaxWizardInput):
 You are an expert Indian tax consultant for FY 2024-25.
 
 USER SALARY:
-- Basic Salary: Rs {data.basic_salary} per year
-- HRA Received: Rs {data.hra_received} per year
-- Rent Paid: Rs {data.rent_paid} per year
-- Special Allowances: Rs {data.special_allowances} per year
-- Gross Income: Rs {gross_income} per year
+- Basic Salary: Rs {data.basic_salary}/year
+- HRA Received: Rs {data.hra_received}/year
+- Rent Paid: Rs {data.rent_paid}/year
+- Special Allowances: Rs {data.special_allowances}/year
+- Gross Income: Rs {gross_income}/year
 
-DEDUCTIONS CLAIMED:
-- 80C: Rs {data.investments_80c} (max Rs 150000)
+CURRENT DEDUCTIONS:
+- 80C investments: Rs {data.investments_80c} (max Rs 150000)
 - 80D health insurance: Rs {data.health_insurance_80d} (max Rs 25000)
 - 80CCD NPS: Rs {data.nps_80ccd} (max Rs 50000)
 - Home loan interest 24b: Rs {data.home_loan_interest} (max Rs 200000)
 - Other: Rs {data.other_deductions}
 
-TAX CALCULATION RULES FY2024-25:
+OLD REGIME (standard deduction Rs 50000 + HRA exemption + all deductions above):
+Slabs: 0 up to 250000, 5% 250001-500000, 20% 500001-1000000, 30% above 1000000
+HRA exemption = min(HRA received, 50% of basic, rent paid minus 10% of basic)
+Add 4% cess on final tax
 
-OLD REGIME SLABS:
-- Up to Rs 250000: 0%
-- Rs 250001 to Rs 500000: 5%
-- Rs 500001 to Rs 1000000: 20%
-- Above Rs 1000000: 30%
-- Standard deduction: Rs 50000
-- HRA exemption: minimum of (actual HRA received, 50% of basic salary for metro city, rent paid minus 10% of basic salary)
-- Add 4% health and education cess on final tax
+NEW REGIME (only standard deduction Rs 75000, no other deductions):
+Slabs: 0 up to 300000, 5% 300001-600000, 10% 600001-900000, 15% 900001-1200000, 20% 1200001-1500000, 30% above 1500000
+87A rebate: if taxable income <= 700000 then tax = 0
+Add 4% cess on final tax
 
-NEW REGIME SLABS:
-- Up to Rs 300000: 0%
-- Rs 300001 to Rs 600000: 5%
-- Rs 600001 to Rs 900000: 10%
-- Rs 900001 to Rs 1200000: 15%
-- Rs 1200001 to Rs 1500000: 20%
-- Above Rs 1500000: 30%
-- Standard deduction: Rs 75000 only
-- No other deductions allowed in new regime
-- Section 87A rebate: if taxable income is less than or equal to Rs 700000 then total tax becomes 0
-- Add 4% health and education cess on final tax
-
-IMPORTANT: Return ONLY a valid JSON object. No explanation, no markdown, no text before or after. Just the raw JSON.
-
+IMPORTANT: Return ONLY valid JSON, no markdown, no explanation before or after:
 {{
-  "gross_income": {gross_income},
   "old_regime": {{
-    "hra_exemption": 0,
-    "total_deductions": 0,
-    "taxable_income": 0,
-    "tax_before_cess": 0,
-    "cess": 0,
-    "total_tax": 0,
-    "effective_rate": 0.0
+    "tax": 0,
+    "effective_rate": 0.0,
+    "deductions": 0
   }},
   "new_regime": {{
-    "standard_deduction": 75000,
-    "taxable_income": 0,
-    "tax_before_cess": 0,
-    "cess": 0,
-    "total_tax": 0,
-    "effective_rate": 0.0
+    "tax": 0,
+    "effective_rate": 0.0,
+    "deductions": 75000
   }},
-  "recommended_regime": "old",
-  "savings_by_switching": 0,
+  "recommended": "old",
+  "savings": 0,
   "missed_deductions": [
     {{
       "section": "80C",
-      "current_amount": {data.investments_80c},
-      "max_allowed": 150000,
-      "gap": 0,
-      "potential_tax_saving": 0,
-      "description": "Invest in ELSS mutual funds, PPF, or NSC to claim full Rs 1.5L deduction",
-      "instruments": ["ELSS Mutual Funds", "PPF", "NSC", "5-year FD"]
+      "description": "You can invest Rs X more in ELSS/PPF",
+      "amount": 0,
+      "how": "Invest in ELSS mutual funds for tax saving and market returns"
     }},
     {{
       "section": "80D",
-      "current_amount": {data.health_insurance_80d},
-      "max_allowed": 25000,
-      "gap": 0,
-      "potential_tax_saving": 0,
-      "description": "Health insurance premium for self and family",
-      "instruments": ["Health Insurance Policy"]
+      "description": "Parents health insurance premium deduction available",
+      "amount": 0,
+      "how": "Get health cover for parents, premiums deductible up to Rs 50000"
     }},
     {{
-      "section": "80CCD(1B)",
-      "current_amount": {data.nps_80ccd},
-      "max_allowed": 50000,
-      "gap": 0,
-      "potential_tax_saving": 0,
-      "description": "Additional NPS contribution gives extra deduction over 80C limit",
-      "instruments": ["National Pension Scheme (NPS)"]
+      "section": "80CCD",
+      "description": "NPS additional contribution deduction available",
+      "amount": 0,
+      "how": "Open NPS account and invest Rs 50000/year for extra deduction"
     }}
   ],
-  "total_additional_savings_possible": 0,
-  "investment_suggestions": [
-    {{
-      "name": "ELSS Mutual Fund",
-      "section": "80C",
-      "expected_returns": "12-15% p.a.",
-      "lock_in": "3 years",
-      "risk": "Moderate-High",
-      "tax_benefit": "Up to Rs 46800 saved"
-    }},
-    {{
-      "name": "Public Provident Fund",
-      "section": "80C",
-      "expected_returns": "7.1% p.a.",
-      "lock_in": "15 years",
-      "risk": "Zero risk",
-      "tax_benefit": "Up to Rs 46800 saved"
-    }},
-    {{
-      "name": "National Pension Scheme",
-      "section": "80CCD(1B)",
-      "expected_returns": "10-12% p.a.",
-      "lock_in": "Till retirement",
-      "risk": "Low-Moderate",
-      "tax_benefit": "Up to Rs 15600 extra saved"
-    }}
+  "suggestions": [
+    {{"name": "Axis ELSS Tax Saver Fund", "returns": "14.8% (3Y)", "lockin": "3 years", "section": "80C"}},
+    {{"name": "HDFC Retirement Savings Fund", "returns": "12.4% (5Y)", "lockin": "Till 60", "section": "80CCD"}},
+    {{"name": "Star Health Insurance", "returns": "N/A", "lockin": "Annual", "section": "80D"}}
+  ],
+  "breakdown": [
+    {{"category": "Gross Income", "old": {gross_income}, "new": {gross_income}}},
+    {{"category": "Deductions", "old": 0, "new": 75000}},
+    {{"category": "Taxable Income", "old": 0, "new": 0}},
+    {{"category": "Tax Payable", "old": 0, "new": 0}}
   ]
 }}
 
-Replace all 0 values with real calculated numbers.
-recommended_regime: whichever has lower total_tax.
-savings_by_switching: absolute difference between the two total_tax values.
-gap in missed_deductions: max_allowed minus current_amount, never negative.
-potential_tax_saving: gap multiplied by the user marginal tax rate.
-total_additional_savings_possible: sum of all potential_tax_saving values.
+Rules:
+- recommended: regime with lower tax
+- savings: absolute difference between old and new tax values
+- missed_deductions amount: potential tax saving in rupees (gap * marginal rate). 0 if already maxed
+- breakdown old Deductions = HRA exemption + standard deduction + all other deductions claimed
+- Replace all 0 values with real calculated numbers
 """
     try:
         raw = call_ai(prompt)
@@ -325,94 +264,94 @@ total_additional_savings_possible: sum of all potential_tax_saving values.
 
 # ─────────────────────────────────────────
 # ENDPOINT 3 — PORTFOLIO X-RAY
+# Shape matches frontend mockData exactly
 # ─────────────────────────────────────────
 
 @app.post("/portfolio-xray")
 async def portfolio_xray(data: PortfolioInput):
     funds_text = "\n".join([
         f"- {f.fund_name}: Invested Rs {f.invested_amount}, "
-        f"Current Value Rs {f.current_value}, Started {f.start_date}"
+        f"Current Rs {f.current_value}, Started {f.start_date}"
         for f in data.funds
     ])
     total_invested = sum(f.invested_amount for f in data.funds)
     total_current = sum(f.current_value for f in data.funds)
     abs_return = total_current - total_invested
-    abs_return_pct = round((abs_return / total_invested * 100), 1) if total_invested > 0 else 0
+    abs_pct = round((abs_return / total_invested * 100), 1) if total_invested > 0 else 0
 
     prompt = f"""
-You are an expert Indian mutual fund analyst. Analyze this portfolio.
+You are an expert Indian mutual fund analyst.
 
 PORTFOLIO:
 {funds_text}
 
 Total Invested: Rs {total_invested}
 Total Current Value: Rs {total_current}
-Absolute Return: Rs {abs_return} which is {abs_return_pct} percent
-Number of funds: {len(data.funds)}
+Return: {abs_pct}%
+Funds: {len(data.funds)}
 
-Use your knowledge of Indian mutual funds to determine each fund category,
-typical holdings, expense ratio, and overlap with other funds in the portfolio.
+Use your knowledge of Indian mutual funds for categories, expense ratios, and fund overlaps.
 
-IMPORTANT: Return ONLY a valid JSON object. No explanation, no markdown, no text before or after. Just the raw JSON.
-
+IMPORTANT: Return ONLY valid JSON, no markdown, no explanation before or after:
 {{
-  "total_invested": {total_invested},
-  "total_current_value": {total_current},
-  "absolute_return": {abs_return},
-  "absolute_return_percent": {abs_return_pct},
   "xirr": 0.0,
-  "vs_nifty50": "+0.0",
-  "expense_drag_yearly": 0,
+  "nifty_comparison": 0.0,
+  "expense_drag": 0,
   "overlap_score": 0,
-  "category_allocation": [
-    {{"category": "Large Cap", "percentage": 0, "amount": 0}},
-    {{"category": "Mid Cap", "percentage": 0, "amount": 0}},
-    {{"category": "Small Cap", "percentage": 0, "amount": 0}},
-    {{"category": "Flexi Cap", "percentage": 0, "amount": 0}},
-    {{"category": "Debt", "percentage": 0, "amount": 0}}
+  "total_invested": {total_invested},
+  "allocation": [
+    {{"name": "Large Cap", "value": 0, "amount": 0, "color": "#00FF87"}},
+    {{"name": "Flexi Cap", "value": 0, "amount": 0, "color": "#7C3AED"}},
+    {{"name": "Mid Cap", "value": 0, "amount": 0, "color": "#F59E0B"}},
+    {{"name": "Small Cap", "value": 0, "amount": 0, "color": "#EF4444"}},
+    {{"name": "Debt", "value": 0, "amount": 0, "color": "#3B82F6"}}
   ],
-  "fund_analysis": [
-    {{
-      "fund_name": "replace with actual fund name",
-      "category": "replace with category",
-      "invested": 0,
-      "current_value": 0,
-      "returns_percent": 0.0,
-      "expense_ratio": 0.0,
-      "rating": 4,
-      "comment": "one line honest assessment"
-    }}
-  ],
-  "overlap_pairs": [
-    {{
-      "fund1": "fund name",
-      "fund2": "fund name",
-      "overlap_percent": 0,
-      "risk_level": "low"
-    }}
-  ],
-  "rebalancing_suggestions": [
+  "rebalancing": [
     {{
       "action": "SELL",
+      "fund": "fund name from portfolio",
+      "reason": "specific reason referencing the fund",
+      "benefit": "specific benefit with rupee or percent numbers"
+    }},
+    {{
+      "action": "BUY",
+      "fund": "recommended fund name",
+      "reason": "specific reason",
+      "benefit": "specific benefit"
+    }},
+    {{
+      "action": "SWITCH",
       "fund": "fund name",
       "reason": "specific reason",
-      "benefit": "expected benefit with numbers",
-      "urgency": "high"
+      "benefit": "specific benefit with numbers"
     }}
   ],
-  "portfolio_health": "Healthy",
-  "diversification_score": 0,
-  "summary": "3 to 4 sentence honest portfolio assessment"
+  "performance": [
+    {{"month": "Jan", "portfolio": 100, "nifty": 100}},
+    {{"month": "Feb", "portfolio": 0, "nifty": 0}},
+    {{"month": "Mar", "portfolio": 0, "nifty": 0}},
+    {{"month": "Apr", "portfolio": 0, "nifty": 0}},
+    {{"month": "May", "portfolio": 0, "nifty": 0}},
+    {{"month": "Jun", "portfolio": 0, "nifty": 0}},
+    {{"month": "Jul", "portfolio": 0, "nifty": 0}},
+    {{"month": "Aug", "portfolio": 0, "nifty": 0}},
+    {{"month": "Sep", "portfolio": 0, "nifty": 0}},
+    {{"month": "Oct", "portfolio": 0, "nifty": 0}},
+    {{"month": "Nov", "portfolio": 0, "nifty": 0}},
+    {{"month": "Dec", "portfolio": 0, "nifty": 0}}
+  ]
 }}
 
 Rules:
-- xirr: estimate realistically between 8 and 25 based on dates and returns
-- vs_nifty50: xirr minus 13.0, format as string like +2.3 or -1.5
-- overlap_score: 60 to 80 for two large cap funds, 10 to 20 for large cap plus small cap
-- category_allocation percentages must sum to exactly 100
-- fund_analysis must have one entry per fund in the portfolio
-- overlap_pairs must cover every unique pair of funds
-- action must be one of SELL, BUY, SWITCH, or INCREASE_SIP
+- xirr: realistic estimate 8-25% based on dates and actual returns
+- nifty_comparison: xirr minus 13.0 (can be negative)
+- expense_drag: annual rupee cost from expense ratios across all funds
+- overlap_score: 60-80 for two large caps together, 10-20 for large+small
+- allocation values must sum to exactly 100
+- allocation amounts must sum to approximately {total_invested}
+- performance: both start at 100, show realistic monthly indexed values through the year
+- rebalancing actions must reference actual funds in the portfolio above
+- Replace all 0 values with real calculated numbers
 """
     try:
         raw = call_ai(prompt)
@@ -431,7 +370,7 @@ Rules:
 async def ai_chat(data: ChatInput):
     context_text = ""
     if data.user_context:
-        context_text = f"\nUSER FINANCIAL CONTEXT (use this to personalize your answers):\n{json.dumps(data.user_context, indent=2)}\n"
+        context_text = f"\nUSER CONTEXT:\n{json.dumps(data.user_context, indent=2)}\n"
 
     history_text = ""
     for msg in data.history[-6:]:
@@ -440,18 +379,15 @@ async def ai_chat(data: ChatInput):
 
     prompt = f"""
 You are MoneyMind AI, a friendly Indian personal finance advisor.
-Speak in a warm helpful tone. Give specific actionable advice.
-Always mention Indian financial products where relevant: ELSS, PPF, NPS, SIP, NSE, BSE.
-Reference Indian tax laws and rupee amounts.
-Keep responses concise — maximum 4 short paragraphs or a brief bullet list.
-Never be generic. Always be specific to the user's situation.
+Give specific actionable advice using Indian products: ELSS, PPF, NPS, SIP.
+Use rupee amounts. Keep it concise — max 4 short paragraphs or a brief list.
 {context_text}
-CONVERSATION SO FAR:
+CONVERSATION:
 {history_text}
 
-User just said: {data.message}
+User: {data.message}
 
-Respond as MoneyMind AI. Do not prefix your reply with your name.
+Respond directly without prefixing your name:
 """
     try:
         raw = call_ai(prompt)
@@ -478,22 +414,15 @@ async def parse_pdf(
             text += page.get_text()
         doc.close()
     except Exception:
-        raise HTTPException(
-            status_code=400,
-            detail="Could not read PDF. Make sure it is a valid text-based PDF."
-        )
+        raise HTTPException(status_code=400, detail="Could not read PDF. Use a text-based PDF.")
 
     if not text.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="PDF appears to be scanned or image-based. Please enter data manually."
-        )
+        raise HTTPException(status_code=400, detail="PDF is image-based. Please enter data manually.")
 
     if pdf_type == "form16":
         prompt = f"""
-Extract salary and tax data from this Form 16 document.
-IMPORTANT: Return ONLY a valid JSON object. No explanation, no markdown, no text before or after.
-
+Extract salary and tax data from this Form 16.
+Return ONLY valid JSON, no markdown, no explanation:
 {{
   "basic_salary": 0,
   "hra_received": 0,
@@ -504,34 +433,28 @@ IMPORTANT: Return ONLY a valid JSON object. No explanation, no markdown, no text
   "home_loan_interest": 0,
   "other_deductions": 0
 }}
+Use 0 for missing fields. All amounts annual in rupees as plain numbers.
 
-Replace 0 with actual annual rupee amounts found in the document.
-Use 0 for any field not found in the document.
-
-DOCUMENT TEXT:
+DOCUMENT:
 {text[:3000]}
 """
     else:
         prompt = f"""
-Extract mutual fund portfolio data from this CAMS or KFintech statement.
-IMPORTANT: Return ONLY a valid JSON object. No explanation, no markdown, no text before or after.
-
+Extract mutual fund data from this CAMS or KFintech statement.
+Return ONLY valid JSON, no markdown, no explanation:
 {{
   "funds": [
     {{
-      "fund_name": "exact fund name from document",
+      "fund_name": "exact fund name",
       "invested_amount": 0,
       "current_value": 0,
       "start_date": "YYYY-MM-DD"
     }}
   ]
 }}
+One entry per fund. Earliest transaction date as start_date. Amounts in rupees.
 
-Create one entry per fund found in the document.
-Use the earliest transaction date as start_date in YYYY-MM-DD format.
-All amounts in rupees as plain numbers.
-
-DOCUMENT TEXT:
+DOCUMENT:
 {text[:4000]}
 """
 
@@ -539,10 +462,7 @@ DOCUMENT TEXT:
         raw = call_ai(prompt)
         return extract_json(raw)
     except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=500,
-            detail="Could not extract data from PDF. Please enter manually."
-        )
+        raise HTTPException(status_code=500, detail="Could not extract PDF data. Please enter manually.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"PDF parsing failed: {str(e)}")
 
